@@ -7,6 +7,7 @@ def healthz(_request):
 	return JsonResponse({'status': 'ok'})
 
 urlpatterns = [
+	path('', healthz),  # Root route for Render health checks
 	path('admin/', admin.site.urls),
 	path('healthz', healthz),
 	path('api/trips/', include('trips.urls')),
