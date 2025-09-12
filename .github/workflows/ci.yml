@@ -1,0 +1,111 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run backend tests
+      run: |
+        cd backend
+        python manage.py test
+      env:
+        SECRET_KEY: test-secret-key
+        DEBUG: true
+        ALLOWED_HOSTS: "*"
+        ORS_API_KEY: test-key
+        GRAPHHOPPER_API_KEY: test-key
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: project/package-lock.json
+    
+    - name: Install frontend dependencies
+      run: |
+        cd project
+        npm ci
+    
+    - name: Run frontend linting
+      run: |
+        cd project
+        npm run lint
+    
+    - name: Build frontend
+      run: |
+        cd project
+        npm run build
+      env:
+        VITE_BACKEND_URL: http://localhost:8000
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: project/package-lock.json
+    
+    - name: Start backend
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        python manage.py migrate
+        python manage.py runserver 0.0.0.0:8000 &
+        sleep 10
+      env:
+        SECRET_KEY: test-secret-key
+        DEBUG: true
+        ALLOWED_HOSTS: "*"
+        ORS_API_KEY: test-key
+        GRAPHHOPPER_API_KEY: test-key
+    
+    - name: Test backend health
+      run: |
+        curl -f http://localhost:8000/healthz || exit 1
+    
+    - name: Build and test frontend
+      run: |
+        cd project
+        npm ci
+        npm run build
+      env:
+        VITE_BACKEND_URL: http://localhost:8000
