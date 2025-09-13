@@ -27,7 +27,8 @@ logs/
 .idea/
 *.swp
 *.swo
-.bolt/
+project/.bolt/
+
 
 # OS
 .DS_Store
